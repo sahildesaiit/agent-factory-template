@@ -15,18 +15,24 @@ jobs:
       - name: Checkout Code Blueprint
         uses: actions/checkout@v4
 
-      - name: Setup Node Environment
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Initialize AI Agent Runner
         env:
           GEMINI_API_KEY: ${{ secrets.WARP_FACTORY_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🤖 Waking up Agent Factory..."
-          npx -y @google/genai-cli prompt \
-            --model gemini-2.5-flash \
-            --system "$(cat .agents/skills/developer.md)" \
-            "An issue has been opened. Please analyze the repository and draft a solution for: ${{ github.event.issue.title }} - ${{ github.event.issue.body }}"
+          
+          # Read the instruction rules safely into a variable
+          SYSTEM_INSTRUCTION=$(cat .agents/skills/developer.md)
+          USER_PROMPT="An issue has been opened. Request: ${{ github.event.issue.title }} - ${{ github.event.issue.body }}"
+          
+          # Connect cleanly to the Gemini API endpoint
+          RESPONSE=$(curl -s -X POST "https://googleapis.com{GEMINI_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"systemInstruction\":{\"parts\":[{\"text\":\"${SYSTEM_INSTRUCTION}\"}]},\"contents\":[{\"parts\":[{\"text\":\"${USER_PROMPT}\"}]}]}")
+          
+          # Extract the text reply from the response
+          AGENT_REPLY=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text')
+          
+          # Use GitHub CLI to post the agent's response back to your issue page
+          gh issue comment ${{ github.event.issue.number }} --body "$AGENT_REPLY"
