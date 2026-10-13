@@ -10,7 +10,7 @@ const MAX_CONTEXT_FILES = 60;
 const MAX_DIFF_CHARS = 60_000;
 const DEVELOPER_PROMPT_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../../developer.md",
+  "../../.agents/skills/developer.md",
 );
 
 function run(command, args, { input, allowFailure = false } = {}) {
