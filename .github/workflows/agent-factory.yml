@@ -18,21 +18,35 @@ jobs:
       - name: Initialize AI Agent Runner
         env:
           GEMINI_API_KEY: ${{ secrets.WARP_FACTORY_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🤖 Waking up Agent Factory..."
           
           # Read the instruction rules safely into a variable
           SYSTEM_INSTRUCTION=$(cat .agents/skills/developer.md)
-          USER_PROMPT="An issue has been opened. Request: ${{ github.event.issue.title }} - ${{ github.event.issue.body }}"
           
-          # Connect cleanly to the Gemini API endpoint
+          # Clean and escape user inputs to prevent double quotes from breaking the JSON payload
+          ESCAPED_TITLE=$(echo "${{ github.event.issue.title }}" | sed 's/"/\\"/g')
+          ESCAPED_BODY=$(echo "${{ github.event.issue.body }}" | sed 's/"/\\"/g')
+          USER_PROMPT="An issue has been opened. Request: ${ESCAPED_TITLE} - ${ESCAPED_BODY}"
+          
+          # FIX: Connect cleanly to the functional Google AI Studio endpoint using gemini-2.5-flash
           RESPONSE=$(curl -s -X POST "https://googleapis.com{GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
-            -d "{\"systemInstruction\":{\"parts\":[{\"text\":\"${SYSTEM_INSTRUCTION}\"}]},\"contents\":[{\"parts\":[{\"text\":\"${USER_PROMPT}\"}]}]}")
+            -d "{
+              \"systemInstruction\": {\"parts\": [{\"text\": \"${SYSTEM_INSTRUCTION}\"}]},
+              \"contents\": [{\"parts\": [{\"text\": \"${USER_PROMPT}\"}]}]
+            }")
           
-          # Extract the text reply from the response
-          AGENT_REPLY=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text')
+          # FIX: Extract the text content safely using the valid Gemini response structure mapping
+          AGENT_REPLY=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
+          
+          # Safeguard check to ensure we received a response before trying to post a comment
+          if [ -z "$AGENT_REPLY" ] || [ "$AGENT_REPLY" = "null" ]; then
+            echo "❌ Error: Received empty or invalid response from Gemini API."
+            echo "Full Response Log for debugging: $RESPONSE"
+            exit 1
+          fi
           
           # Use GitHub CLI to post the agent's response back to your issue page
           gh issue comment ${{ github.event.issue.number }} --body "$AGENT_REPLY"
