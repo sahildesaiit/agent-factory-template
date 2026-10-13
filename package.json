@@ -1,0 +1,11 @@
+{
+  "name": "ai-software-factory-template",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "factory": "node .github/scripts/factory-agent.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0"
+  }
+}
