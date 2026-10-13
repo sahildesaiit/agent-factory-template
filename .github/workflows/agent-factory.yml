@@ -1,9 +1,12 @@
-name: Agent Factory Runner
+name: Free Agent Factory Runner
 on:
   issues:
-    types: [opened, labeled]
-  pull_request:
     types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
   run-agent:
@@ -12,9 +15,18 @@ jobs:
       - name: Checkout Code Blueprint
         uses: actions/checkout@v4
 
-      - name: Execute Warp Factory Pipeline
-        uses: warpdotdev/factory-action@v1
+      - name: Setup Node Environment
+        uses: actions/setup-node@v4
         with:
-          api-key: ${{ secrets.WARP_FACTORY_API_KEY }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          agent-skills-path: './.agents/skills'
+          node-version: 20
+
+      - name: Initialize AI Agent Runner
+        env:
+          GEMINI_API_KEY: ${{ secrets.WARP_FACTORY_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🤖 Waking up Agent Factory..."
+          npx -y @google/genai-cli prompt \
+            --model gemini-2.5-flash \
+            --system "$(cat .agents/skills/developer.md)" \
+            "An issue has been opened. Please analyze the repository and draft a solution for: ${{ github.event.issue.title }} - ${{ github.event.issue.body }}"
