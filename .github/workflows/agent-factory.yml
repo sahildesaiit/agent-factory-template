@@ -1,7 +1,10 @@
-name: Free Agent Factory Runner
+name: AI Software Factory
+
 on:
   issues:
-    types: [opened]
+    types: [opened, labeled]
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -9,44 +12,76 @@ permissions:
   pull-requests: write
 
 jobs:
-  run-agent:
+  triage:
+    name: Issue Triage
+    if: github.event_name == 'issues' && github.event.action == 'opened'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code Blueprint
         uses: actions/checkout@v4
 
-      - name: Initialize AI Agent Runner
+      - name: Setup Node Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run Factory Triage
         env:
-          GEMINI_API_KEY: ${{ secrets.WARP_FACTORY_API_KEY }}
+          FACTORY_STAGE: triage
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.WARP_FACTORY_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "🤖 Waking up Agent Factory..."
-          
-          # Read the instruction rules safely into a variable
-          SYSTEM_INSTRUCTION=$(cat .agents/skills/developer.md)
-          
-          # Clean and escape user inputs to prevent double quotes from breaking the JSON payload
-          ESCAPED_TITLE=$(echo "${{ github.event.issue.title }}" | sed 's/"/\\"/g')
-          ESCAPED_BODY=$(echo "${{ github.event.issue.body }}" | sed 's/"/\\"/g')
-          USER_PROMPT="An issue has been opened. Request: ${ESCAPED_TITLE} - ${ESCAPED_BODY}"
-          
-          # FIX: Connect cleanly to the functional Google AI Studio endpoint using gemini-2.5-flash
-          RESPONSE=$(curl -s -X POST "https://googleapis.com{GEMINI_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"systemInstruction\": {\"parts\": [{\"text\": \"${SYSTEM_INSTRUCTION}\"}]},
-              \"contents\": [{\"parts\": [{\"text\": \"${USER_PROMPT}\"}]}]
-            }")
-          
-          # FIX: Extract the text content safely using the valid Gemini response structure mapping
-          AGENT_REPLY=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
-          
-          # Safeguard check to ensure we received a response before trying to post a comment
-          if [ -z "$AGENT_REPLY" ] || [ "$AGENT_REPLY" = "null" ]; then
-            echo "❌ Error: Received empty or invalid response from Gemini API."
-            echo "Full Response Log for debugging: $RESPONSE"
-            exit 1
-          fi
-          
-          # Use GitHub CLI to post the agent's response back to your issue page
-          gh issue comment ${{ github.event.issue.number }} --body "$AGENT_REPLY"
+        run: npm run factory
+
+  implementation:
+    name: Code Implementation
+    if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'ready-to-implement'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Blueprint
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run Factory Implementation
+        env:
+          FACTORY_STAGE: implementation
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.WARP_FACTORY_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run factory
+
+  review:
+    name: Pull Request Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Blueprint
+        uses: actions/checkout@v4
+
+      - name: Setup Node Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run Factory Review
+        env:
+          FACTORY_STAGE: review
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.WARP_FACTORY_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run factory

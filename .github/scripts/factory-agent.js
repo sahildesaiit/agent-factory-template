@@ -145,6 +145,7 @@ function isIgnoredContextPath(file) {
   return (
     file.startsWith(".github/") ||
     file.startsWith(".git/") ||
+    file.startsWith(".agents/") ||
     file === "developer.md" ||
     segments.some(
       (part) =>
@@ -213,6 +214,8 @@ function validatePatch(patch) {
       file.split("/").includes("..") ||
       file === ".github" ||
       file.startsWith(".github/") ||
+      file === ".agents" ||
+      file.startsWith(".agents/") ||
       file === ".git" ||
       file.startsWith(".git/") ||
       file.split("/").some((part) => part.startsWith(".env"))
