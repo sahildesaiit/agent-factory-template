@@ -79,13 +79,13 @@ async function generate(prompt, { systemInstruction, responseMimeType } = {}) {
   const { client, model } = getClient();
   const candidateModels = [
     model,
-    model.includes("flash") ? model.replace("flash", "pro") : model.replace("pro", "flash"),
+    model !== "gemini-2.5-pro" ? "gemini-2.5-pro" : "gemini-3.8-flash",
   ];
   const uniqueModels = [...new Set(candidateModels)];
 
   let lastError;
   for (const targetModel of uniqueModels) {
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 4; attempt++) {
       try {
         console.log(`Calling Gemini API (${targetModel}, attempt ${attempt})...`);
         const response = await client.models.generateContent({
@@ -103,9 +103,9 @@ async function generate(prompt, { systemInstruction, responseMimeType } = {}) {
         lastError = err;
         const errMsg = err?.message || String(err);
         const isRetryable = /503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand/i.test(errMsg);
-        if (isRetryable && attempt < 3) {
-          const delay = attempt * 3000;
-          console.warn(`Gemini (${targetModel}) temporary spike (503/429). Retrying in ${delay / 1000}s...`);
+        if (isRetryable && attempt < 4) {
+          const delay = attempt * 4000;
+          console.warn(`Gemini (${targetModel}) busy (503/429). Retrying in ${delay / 1000}s...`);
           await new Promise((r) => setTimeout(r, delay));
           continue;
         }
