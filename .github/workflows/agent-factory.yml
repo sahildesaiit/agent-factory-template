@@ -15,7 +15,7 @@ jobs:
   triage:
     name: Issue Triage
     if: github.event_name == 'issues' && github.event.action == 'opened'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     steps:
       - name: Checkout Code Blueprint
         uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
   implementation:
     name: Code Implementation
     if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'ready-to-implement'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     steps:
       - name: Checkout Code Blueprint
         uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
   review:
     name: Pull Request Review
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     steps:
       - name: Checkout Code Blueprint
         uses: actions/checkout@v4
