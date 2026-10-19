@@ -102,7 +102,7 @@ async function generate(prompt, { systemInstruction, responseMimeType } = {}) {
       } catch (err) {
         lastError = err;
         const errMsg = err?.message || String(err);
-        const isRetryable = /503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand/i.test(errMsg);
+        const isRetryable = /503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket/i.test(errMsg);
         if (isRetryable && attempt < 4) {
           const delay = attempt * 4000;
           console.warn(`Gemini (${targetModel}) busy (503/429). Retrying in ${delay / 1000}s...`);
