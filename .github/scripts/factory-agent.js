@@ -209,10 +209,13 @@ async function readCodebaseContext() {
 }
 
 function extractPatch(response) {
-  const patch = response.trim();
-  if (patch.startsWith("```")) {
-    const withoutOpeningFence = patch.replace(/^```(?:diff)?\s*\n/, "");
-    return withoutOpeningFence.replace(/\n```\s*$/, "");
+  let patch = response.trim();
+  const fenceMatch = /```(?:diff)?\s*\n([\s\S]*?)\n```/.exec(patch);
+  if (fenceMatch) {
+    patch = fenceMatch[1].trim();
+  } else if (patch.includes("diff --git ")) {
+    const startIndex = patch.indexOf("diff --git ");
+    patch = patch.slice(startIndex).trim();
   }
   return patch;
 }
@@ -285,10 +288,29 @@ async function implementation(issue, developerPrompt) {
     },
   );
   const patch = extractPatch(response);
-  const paths = validatePatch(patch);
+  let paths;
+  try {
+    paths = validatePatch(patch);
+  } catch (err) {
+    console.warn(`Patch validation failed: ${err.message}`);
+    await postIssueComment(
+      issue.number,
+      `## Factory implementation assessment\n\nGemini analyzed the issue but could not produce an automated unified git diff:\n\n> ${err.message}\n\n**Gemini Notes:**\n\n${response.slice(0, 2000)}`,
+    );
+    return;
+  }
   await run("git", ["checkout", "-b", branch]);
-  await run("git", ["apply", "--check", "-"], { input: patch });
-  await run("git", ["apply", "-"], { input: patch });
+  try {
+    await run("git", ["apply", "--check", "-"], { input: patch });
+    await run("git", ["apply", "-"], { input: patch });
+  } catch (applyErr) {
+    console.warn(`git apply failed: ${applyErr.message}`);
+    await postIssueComment(
+      issue.number,
+      `## Factory implementation diff error\n\nGemini produced a diff, but it could not be applied cleanly:\n\n\`\`\`diff\n${patch.slice(0, 3000)}\n\`\`\``,
+    );
+    return;
+  }
   await run("git", ["add", "--", ...paths]);
   const staged = await run("git", ["diff", "--cached", "--quiet"], { allowFailure: true });
   if (staged.code === 0) {
