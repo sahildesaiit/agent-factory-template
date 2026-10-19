@@ -77,17 +77,44 @@ function getClient() {
 
 async function generate(prompt, { systemInstruction, responseMimeType } = {}) {
   const { client, model } = getClient();
-  const response = await client.models.generateContent({
+  const candidateModels = [
     model,
-    contents: prompt,
-    config: {
-      systemInstruction,
-      responseMimeType,
-      maxOutputTokens: 8192,
-    },
-  });
-  if (!response.text) throw new Error("Gemini returned an empty response");
-  return response.text;
+    model.includes("flash") ? model.replace("flash", "pro") : model.replace("pro", "flash"),
+  ];
+  const uniqueModels = [...new Set(candidateModels)];
+
+  let lastError;
+  for (const targetModel of uniqueModels) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`Calling Gemini API (${targetModel}, attempt ${attempt})...`);
+        const response = await client.models.generateContent({
+          model: targetModel,
+          contents: prompt,
+          config: {
+            systemInstruction,
+            responseMimeType,
+            maxOutputTokens: 8192,
+          },
+        });
+        if (!response.text) throw new Error("Gemini returned an empty response");
+        return response.text;
+      } catch (err) {
+        lastError = err;
+        const errMsg = err?.message || String(err);
+        const isRetryable = /503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand/i.test(errMsg);
+        if (isRetryable && attempt < 3) {
+          const delay = attempt * 3000;
+          console.warn(`Gemini (${targetModel}) temporary spike (503/429). Retrying in ${delay / 1000}s...`);
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        console.warn(`Model ${targetModel} attempt ${attempt} failed: ${errMsg}`);
+        break;
+      }
+    }
+  }
+  throw lastError;
 }
 
 async function gh(args) {
