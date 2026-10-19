@@ -68,9 +68,9 @@ function getPullRequest(event) {
 
 function getClient() {
   const apiKey = requiredEnv("GEMINI_API_KEY");
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-  if (!/^gemini-2\.5-(flash|pro)$/.test(model)) {
-    throw new Error("GEMINI_MODEL must be gemini-2.5-flash or gemini-2.5-pro");
+  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  if (!/^gemini-(?:2\.5|3\.8)-(?:flash|pro)$/.test(model)) {
+    throw new Error("GEMINI_MODEL must be gemini-3.8-flash, gemini-3.8-pro, gemini-2.5-flash, or gemini-2.5-pro");
   }
   return { client: new GoogleGenAI({ apiKey }), model };
 }
